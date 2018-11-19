@@ -60,7 +60,7 @@ class CocoModel(yolo_model.YoloDetection):
             num_classes=flags.FLAGS.num_classes,
             anchors=anchors,
             batch_size=distribution_utils.per_device_batch_size(flags.FLAGS.batch_size,
-                                                                flags.FLAGS.num_gpus),
+                                                                flags_core.get_num_gpus(flags.FLAGS)),
             num_anchors=num_anchors,
             learning_rate=flags.FLAGS.learning_rate,
             backbone=flags.FLAGS.backbone,
