@@ -250,7 +250,7 @@ def unconv2d(x, output_dims, ksize, stride=1, norm=None, activation=None,
             bias = _bias('bias', [output_dims])
             x = tf.add(x, bias)
         if norm is not None:
-            x = _norm(x, norm, is_training)
+            x = _norm(x, norm, is_training, data_format)
         if activation is not None:
             x = activation(x)
         return x
@@ -271,7 +271,7 @@ def _norm(x, norm, is_training, activation=None, data_format=None):
         return _instance_norm(x, data_format=data_format)
 
 
-def _batch_norm(x, is_training, activation=None):
+def _batch_norm(x, is_training, data_format, activation=None):
     """
     :param x: 2D or 4D tensor
     :param is_training: bool, is training or not
@@ -279,11 +279,10 @@ def _batch_norm(x, is_training, activation=None):
     :return: batch normalization of input
     """
     with tf.variable_scope('batch_normalization'):
-        x = tf.contrib.layers.batch_norm(x,
-                                         decay=0.9,
-                                         scale=True,
-                                         updates_collections=None,
-                                         is_training=is_training)
+        x = tf.layers.batch_normalization(
+            inputs=x, axis=1 if data_format == 'NCHW' else 3,
+            momentum=0.997, epsilon=1e-5, center=True,
+            scale=True, training=is_training, fused=True)
         if activation is not None:
             x = activation(x)
         return x
