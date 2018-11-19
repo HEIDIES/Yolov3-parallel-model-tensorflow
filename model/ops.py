@@ -266,7 +266,7 @@ def _norm(x, norm, is_training, activation=None, data_format=None):
     :return:
     """
     if norm == 'batch':
-        return _batch_norm(x, is_training, activation=activation)
+        return _batch_norm(x, is_training, activation=activation, data_format=data_format)
     if norm == 'instance':
         return _instance_norm(x, data_format=data_format)
 
