@@ -79,7 +79,7 @@ def coco_model_fn(features, labels, mode, params):
                           flags.FLAGS.image_channels])
 
     learning_rate_fn = yolo_run_loop.learning_rate_with_decay(
-        batch_size=params['batch_size'],  batch_denom=32,
+        batch_size=flags.FLAGS.batch_size,  batch_denom=32,
         num_images=params['train'], boundary_epochs=[101],
         decay_rates=[1, 0.1], base_lr=params['learning_rate']
     )

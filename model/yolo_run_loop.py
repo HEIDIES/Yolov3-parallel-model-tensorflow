@@ -584,7 +584,8 @@ def yolo_main(flags_obj, model_function, input_function, dataset, augmentation):
         warm_start_from=warm_start_settings, params={
             'num_classes': flags_obj.num_classes,
             'data_format': flags_obj.data_format,
-            'batch_size': flags_obj.batch_size,
+            'batch_size': distribution_utils.per_device_batch_size(flags_obj.batch_size,
+                                                                   flags_core.get_num_gpus(flags_obj)),
             'image_size': int(flags_obj.image_size),
             'loss_scale': flags_core.get_loss_scale(flags_obj),
             'dtype': flags_core.get_tf_dtype(flags_obj),
