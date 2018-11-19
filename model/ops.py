@@ -11,7 +11,7 @@ def leaky_relu(x):
     Returns:
         2-D or 4-D tensor, activation value of input.
     """
-    return tf.where(tf.greater(x, 0), x, 0.001 * x)
+    return tf.where(tf.greater(x, 0), x, 0.1 * x)
 
 
 def _weights(name, shape, mean=0.0, stddev=0.01, initializer=None):

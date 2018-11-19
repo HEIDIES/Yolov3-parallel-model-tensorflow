@@ -55,10 +55,10 @@ class Yolov3:
         """
 
         if self.dtype in CASTABLE_TYPES:
-            var = getter(name, shape, tf.float32, *args, **kwargs)
+            var = getter(name, shape, *args, **kwargs)
             return tf.cast(var, dtype=self.dtype, name=name + '_cast')
         else:
-            return getter(name, shape, self.dtype, *args, **kwargs)
+            return getter(name, shape, *args, **kwargs)
 
     def _model_variable_scope(self):
         """Returns a variable scope that the model should be created under.

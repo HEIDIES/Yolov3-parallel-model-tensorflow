@@ -673,7 +673,7 @@ def process_dataset(dataset,
         _dtype = np.float16
 
     dataset = dataset.apply(
-        tf.data.experimental.map_and_batch(
+        tf.contrib.data.map_and_batch(
             lambda img_id:
                 tf.py_func(
                     func=functools.partial(parse_fn, dataset=data_set, augmentation=augmentation, dtype=_dtype,

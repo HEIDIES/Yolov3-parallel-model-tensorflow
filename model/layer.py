@@ -2,6 +2,38 @@ import tensorflow as tf
 from model import ops
 
 
+def fixed_shape_conv2d(name, inputs, filters: int, kernel_size: int,
+                       downsample: bool, batch_norm: bool, activation: str):
+    with tf.variable_scope(name):
+
+        if batch_norm:
+            use_bias = False
+        else:
+            use_bias = True
+
+        if downsample:
+            paddings = tf.constant([[0, 0], [1, 1], [1, 1], [0, 0]])
+            inputs = tf.pad(inputs, paddings, 'CONSTANT')
+            strides = (2, 2)
+            padding = 'VALID'
+        else:
+            strides = (1, 1)
+            padding = 'SAME'
+
+        inputs = tf.layers.conv2d(inputs=inputs, filters=filters, kernel_size=kernel_size, strides=strides,
+                                  use_bias=use_bias, padding=padding)
+
+        if batch_norm:
+            inputs = tf.layers.batch_normalization(inputs=inputs, momentum=0.9, epsilon=1e-05)
+
+        if activation == 'LEAKY':
+            inputs = tf.nn.leaky_relu(features=inputs, alpha=0.1)
+
+        shortcut = inputs
+
+        return inputs, shortcut
+
+
 def c3s1k32(ipt, name='c3s1k32', reuse=False, is_training=True, norm='batch'):
     return ops.conv2d(ipt, 32, 3, 1, 1, norm=norm, activation=ops.leaky_relu,
                       name=name, reuse=reuse, is_training=is_training)

@@ -54,10 +54,10 @@ class Darknet:
         """
 
         if self.dtype in CASTABLE_TYPES:
-            var = getter(name, shape, tf.float32, *args, **kwargs)
+            var = getter(name, shape, *args, **kwargs)
             return tf.cast(var, dtype=self.dtype, name=name + '_cast')
         else:
-            return getter(name, shape, self.dtype, *args, **kwargs)
+            return getter(name, shape, *args, **kwargs)
 
     def _model_variable_scope(self):
         """Returns a variable scope that the model should be created under.
@@ -75,7 +75,8 @@ class Darknet:
     def __call__(self, ipt, is_training):
         self.is_training = is_training
         with self._model_variable_scope():
-            c3s1k32 = layer.c3s1k32(ipt, name='conv_0', reuse=self.reuse, is_training=self.is_training, norm=self.norm)
+            c3s1k32, _ = layer.fixed_shape_conv2d(name='conv_0', inputs=ipt, filters=32, kernel_size=3,
+                                                  downsample=False, batch_norm=True, activation='LEAKY')
             c3s2k64 = layer.c3s2k64(c3s1k32, name='conv_1',
                                     reuse=self.reuse, is_training=self.is_training, norm=self.norm)
 

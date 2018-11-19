@@ -10,6 +10,7 @@ import tensorflow as tf  # pylint: disable=g-bad-import-order
 
 from utils import core as flags_core
 from utils import utils
+from utils import distribution_utils
 from model import yolo_model
 from model import yolo_run_loop
 from data_processor import coco_dataset
@@ -26,20 +27,21 @@ def define_coco_flags():
     """Key flags for coco."""
     yolo_run_loop.define_yolo_flags()
     flags.adopt_module_key_flags(yolo_run_loop)
-    flags_core.set_defaults(data_dir='/workspace/dataset/coco',
-                            model_dir='/workspace/model/yolov3/coco_model/',
+    flags_core.set_defaults(data_dir='/home/hume/Deep-learning/dataset/coco',
+                            model_dir='/home/hume/Deep-learning/model/yolov3/coco_model/',
                             train_epochs=150,
                             epochs_between_evals=10,
-                            batch_size=32,
+                            batch_size=16,
                             num_classes=1+80,
                             threshold=0.5,
                             confidence_score=0.7,
                             learning_rate=0.001,
-                            dtype='fp16',
+                            dtype='fp32',
                             backbone='darknet53',
                             image_size=416,
                             image_channels=3,
                             anchors_path='../data_processor/anchors.txt',
+                            data_format='channels_last',
                             image_bytes_as_serving_input=False)
     return flags.FLAGS
 
@@ -372,10 +374,8 @@ def run_coco(flag_obj, is_training):
     else:
         augmentation = None
 
-    input_function = input_fn
-
     yolo_run_loop.yolo_main(
-        flag_obj, coco_model_fn, input_function, dataset,
+        flag_obj, model_function=coco_model_fn, input_function=input_fn, dataset=dataset,
         augmentation=augmentation)
 
 
@@ -384,12 +384,17 @@ def test(_):
     flag_obj = define_coco_flags()
     cocodataset = coco_dataset.CocoDataset()
 
-    cocodataset.load_coco('/workspace/dataset/coco', 'train', DEFAULT_DATASET_YEAR)
+    cocodataset.load_coco('/home/hume/Deep-learning/dataset/coco', 'train', DEFAULT_DATASET_YEAR)
     cocodataset.prepare()
 
     input_iter = input_fn(cocodataset,
-                          is_training=True, batch_size=flag_obj.batch_size, anchors_path=flag_obj.anchors_path,
-                          num_epochs=flag_obj.train_epochs, max_num_boxes_per_image=flag_obj.max_num_boxes_per_image,
+                          is_training=True,
+                          batch_size=distribution_utils.per_device_batch_size(flag_obj.batch_size,
+                                                                              flags_core.get_num_gpus(flag_obj)),
+                          anchors_path=flag_obj.anchors_path,
+                          num_epochs=flag_obj.train_epochs,
+                          dtype=tf.float32,
+                          max_num_boxes_per_image=flag_obj.max_num_boxes_per_image,
                           image_size=flag_obj.image_size,
                           num_parallel_batches=flag_obj.datasets_num_parallel_batches,
                           datasets_num_private_threads=multiprocessing.cpu_count() - 3
@@ -399,7 +404,7 @@ def test(_):
     imgs, y_gt = coco_iter.get_next()
     print('cost {}ms\n'.format((time() - starttime) * 1000))
 
-    print('imgs has shape: {} (batch_size, height, width, channels), dtype: {}'.format(imgs.shape, imgs.dtype))
+    print(imgs)
     print(y_gt.shape)
 
 
@@ -407,7 +412,7 @@ def test_parse(_):
     flag_obj = define_coco_flags()
     cocodataset = coco_dataset.CocoDataset()
 
-    cocodataset.load_coco('/workspace/dataset/coco', 'train', DEFAULT_DATASET_YEAR)
+    cocodataset.load_coco('/home/hume/Deep-learning/dataset/coco', 'train', DEFAULT_DATASET_YEAR)
     cocodataset.prepare()
 
     image_id = cocodataset.image_ids[1]
@@ -416,7 +421,7 @@ def test_parse(_):
                          augmentation=None,
                          dtype=np.float32, max_num_boxes_per_image=20, image_size=416)
 
-    print(y_gt.shape)
+    print(img.shape, y_gt.shape)
 
 
 def main(_):
@@ -425,4 +430,4 @@ def main(_):
 
 
 if __name__ == '__main__':
-    absl_app.run(main)
+    absl_app.run(test)
