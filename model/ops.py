@@ -145,10 +145,10 @@ def fully_connected(x, output_dims, use_bias=True, is_training=True, reuse=False
         return x
 
 
-def conv2d(x, filters, ksize, fixed_pad=True, stride=1, pad_mode='CONSTANT',
+def conv2d(x, filters, ksize, stride=1, fixed_pad=True, pad_mode='CONSTANT',
            norm=None, activation=None, name='conv2d', reuse=False, is_training=True,
            kernel_initializer=None, use_bias=False, upsampling=None, act_first=False,
-           weights_std=0.001, bias_init=0.0, data_format=None):
+           weights_std=0.001, bias_init=0.0, data_format=None,):
     """
     :param x: 4D tensor, [batch_size, height, width, channels]
     :param filters: int, number of output channels
@@ -191,7 +191,7 @@ def conv2d(x, filters, ksize, fixed_pad=True, stride=1, pad_mode='CONSTANT',
                 x = tf.pad(x, [[0, 0], [0, 0], [pad_beg, pad_end], [pad_beg, pad_end]], mode=pad_mode)
         x = tf.nn.conv2d(
             x, weights,
-            strides=[1, stride, stride, 1], padding=('SAME' if fixed_pad and stride == 1 else 'VALID'),
+            strides=[1, stride, stride, 1], padding=('SAME' if not fixed_pad and stride == 1 else 'VALID'),
             name=name, data_format=data_format
         )
 

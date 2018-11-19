@@ -149,6 +149,51 @@ def learning_rate_with_decay(batch_size, batch_denom, num_images, boundary_epoch
     return learning_rate_fn
 
 
+def coords_to_boxes(yolo_boxes_out, num_classes):
+
+    x_pred, y_pred, w_pred, h_pred, confs_pred, classes_pred = tf.split(yolo_boxes_out,
+                                                                        [1, 1, 1, 1, 1,
+                                                                         num_classes],
+                                                                        axis=-1)
+
+    up_left_x = x_pred - w_pred / 2.0
+    up_left_y = y_pred - h_pred / 2.0
+    down_right_x = x_pred + w_pred / 2.0
+    down_right_y = y_pred + h_pred / 2.0
+
+    detections = tf.concat([up_left_x, up_left_y, down_right_x, down_right_y, confs_pred, classes_pred], axis=-1)
+
+    return detections
+
+
+def draw_true_boxes(y_true_data, num_classes, batch_size, features):
+
+    yolo_true_data = coords_to_boxes(y_true_data, num_classes)
+
+    yolo_true_images = []
+
+    for i in range(batch_size):
+        conf_true = yolo_true_data[i, :, 4]
+        boxes_true = yolo_true_data[i, :, 0: 4]
+
+        up_left_x, up_left_y, down_right_x, down_right_y = tf.split(boxes_true, [1, 1, 1, 1], axis=-1)
+
+        boxes_true = tf.concat([up_left_y, up_left_x, down_right_y, down_right_x], axis=-1)
+
+        top_k_scores, top_k_indices = tf.nn.top_k(conf_true, k=20)
+
+        boxes_true = tf.gather(boxes_true, top_k_indices)
+
+        boxes_true = tf.expand_dims(boxes_true, axis=0)
+
+        yolo_true_images.append(tf.image.draw_bounding_boxes(tf.expand_dims(features[i, :, :, :], axis=0),
+                                                             boxes_true))
+
+    yolo_true_images = tf.concat(yolo_true_images, axis=0)
+
+    return yolo_true_images
+
+
 def yolo_model_fn(features, labels, mode, model_class,
                   weight_decay, learning_rate_fn, batch_size, num_anchors,
                   data_format, loss_scale, image_size, num_classes,
@@ -270,6 +315,9 @@ def yolo_model_fn(features, labels, mode, model_class,
         y_true_data = tf.reshape(y_true_data, [batch_size, -1, 5 + num_classes])
         y_true_boxes = tf.reshape(y_true_boxes, [batch_size, max_num_boxes_per_image * num_anchors_per_detector, 4])
 
+        origin_images = draw_true_boxes(y_true_data, num_classes, batch_size, features)
+        tf.summary.image('origin_images', origin_images)
+
         large_yolo_true_raw = y_true_data[:, :num_large_detectors, :]
         medium_yolo_true_raw = y_true_data[:, num_large_detectors: num_medium_detectors + num_large_detectors, :]
         small_yolo_true_raw = y_true_data[:, num_medium_detectors + num_large_detectors:, :]
@@ -322,12 +370,12 @@ def yolo_model_fn(features, labels, mode, model_class,
     assert features.dtype == dtype
 
     model = model_class()
-    yolo_out = model(features, mode == tf.estimator.ModeKeys.TRAIN)
+    yolo_out_ = model(features, mode == tf.estimator.ModeKeys.TRAIN)
 
     # This acts as a no-op if the logits are already in fp32 (provided logits are
     # not a SparseTensor). If dtype is is low precision, logits must be cast to
     # fp32 for numerical stability.
-    yolo_out = tf.cast(yolo_out, tf.float32)
+    yolo_out = [tf.cast(y_out, tf.float32) for y_out in yolo_out_]
 
     predictions = {
         'large_obj_box_detections': yolo_out[0],

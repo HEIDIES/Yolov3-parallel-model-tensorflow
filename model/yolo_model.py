@@ -62,12 +62,12 @@ class YoloDetection:
 
         # self.X = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 3])
         # with tf.variable_scope('labels', c)
-        self.Y_true_data = tf.placeholder(dtype=tf.float32,
-                                          shape=[None, self.num_detectors_per_image, self.num_classes + 5])
+        # self.Y_true_data = tf.placeholder(dtype=tf.float32,
+        #                                   shape=[None, self.num_detectors_per_image, self.num_classes + 5])
 
-        self.Y_true_boxes = tf.placeholder(dtype=tf.float32,
-                                           shape=[None,
-                                                  self.max_num_boxes_per_image * self.num_anchors_per_detector, 4])
+        # self.Y_true_boxes = tf.placeholder(dtype=tf.float32,
+        #                                    shape=[None,
+        #                                           self.max_num_boxes_per_image * self.num_anchors_per_detector, 4])
 
         self.darknet = Darknet('darknet', backbone=self.backbone,
                                norm=self.norm, dtype=self.dtype)
@@ -221,33 +221,6 @@ class YoloDetection:
 
         return pred_images
 
-    def draw_true_boxes(self):
-
-        yolo_true_data = self.coords_to_boxes(self.Y_true_data, is_pred=False)
-
-        yolo_true_images = []
-
-        for i in range(self.batch_size):
-            conf_true = yolo_true_data[i, :, 4]
-            boxes_true = yolo_true_data[i, :, 0: 4]
-
-            up_left_x, up_left_y, down_right_x, down_right_y = tf.split(boxes_true, [1, 1, 1, 1], axis=-1)
-
-            boxes_true = tf.concat([up_left_y, up_left_x, down_right_y, down_right_x], axis=-1)
-
-            top_k_scores, top_k_indices = tf.nn.top_k(conf_true, k=20)
-
-            boxes_true = tf.gather(boxes_true, top_k_indices)
-
-            boxes_true = tf.expand_dims(boxes_true, axis=0)
-
-            yolo_true_images.append(tf.image.draw_bounding_boxes(tf.expand_dims(self.X[i, :, :, :], axis=0),
-                                                                 boxes_true))
-
-        yolo_true_images = tf.concat(yolo_true_images, axis=0)
-
-        return yolo_true_images
-
     def __call__(self, ipt, is_training):
 
         self.is_training = is_training
@@ -264,10 +237,6 @@ class YoloDetection:
         dark_out, dark_route_1, dark_route_2 = self.darknet(self.X, self.is_training)
 
         yolo_out = self.yolo_v3(dark_out, dark_route_1, dark_route_2, self.is_training)
-
-        origin_images = self.draw_true_boxes()
-
-        tf.summary.image('origin_images', origin_images)
 
         pred_images = self.draw_boxes(yolo_out)
 

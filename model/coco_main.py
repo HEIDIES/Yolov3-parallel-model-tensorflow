@@ -31,7 +31,7 @@ def define_coco_flags():
                             model_dir='/home/hume/Deep-learning/model/yolov3/coco_model/',
                             train_epochs=150,
                             epochs_between_evals=10,
-                            batch_size=16,
+                            batch_size=4,
                             num_classes=1+80,
                             threshold=0.5,
                             confidence_score=0.7,
@@ -74,6 +74,8 @@ class CocoModel(yolo_model.YoloDetection):
 
 def coco_model_fn(features, labels, mode, params):
     """Model function for coco."""
+    features = tf.reshape(features, [-1, params['image_size'], params['image_size'],
+                          flags.FLAGS.image_channels])
 
     learning_rate_fn = yolo_run_loop.learning_rate_with_decay(
         batch_size=params['batch_size'],  batch_denom=32,
@@ -387,6 +389,8 @@ def test(_):
     cocodataset.load_coco('/home/hume/Deep-learning/dataset/coco', 'train', DEFAULT_DATASET_YEAR)
     cocodataset.prepare()
 
+    augmentation = imgaug.augmenters.Fliplr(0.5)
+
     input_iter = input_fn(cocodataset,
                           is_training=True,
                           batch_size=distribution_utils.per_device_batch_size(flag_obj.batch_size,
@@ -396,6 +400,7 @@ def test(_):
                           dtype=tf.float32,
                           max_num_boxes_per_image=flag_obj.max_num_boxes_per_image,
                           image_size=flag_obj.image_size,
+                          augmentation=augmentation,
                           num_parallel_batches=flag_obj.datasets_num_parallel_batches,
                           datasets_num_private_threads=multiprocessing.cpu_count() - 3
                           )
@@ -404,7 +409,7 @@ def test(_):
     imgs, y_gt = coco_iter.get_next()
     print('cost {}ms\n'.format((time() - starttime) * 1000))
 
-    print(imgs)
+    print(imgs.shape)
     print(y_gt.shape)
 
 
@@ -430,4 +435,4 @@ def main(_):
 
 
 if __name__ == '__main__':
-    absl_app.run(test)
+    absl_app.run(main)
