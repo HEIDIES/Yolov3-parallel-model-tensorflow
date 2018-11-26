@@ -107,6 +107,11 @@ def define_yolo_flags():
              'the anchor values for the model are stored.'
     )
 
+    flags.DEFINE_list(
+        name='mean_pixel', short_name='mp', default=[123.7, 116.8, 103.9],
+        help='The mean value of coco dataset for each channel.'
+    )
+
 
 def learning_rate_with_decay(batch_size, batch_denom, num_images, boundary_epochs, decay_rates,
                              base_lr=0.1, warmup=False):

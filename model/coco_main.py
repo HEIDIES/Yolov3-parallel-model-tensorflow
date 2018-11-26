@@ -42,6 +42,7 @@ def define_coco_flags():
                             image_channels=3,
                             anchors_path='../data_processor/anchors.txt',
                             data_format='channels_last',
+                            mean_pixel=[123.7, 116.8, 103.9],
                             image_bytes_as_serving_input=False)
     return flags.FLAGS
 
@@ -308,7 +309,7 @@ def parse_fn(image_id, dataset, anchors_path, augmentation=None, dtype=np.float3
 
     yolo_gt = np.concatenate([yolo_true_data, yolo_true_boxes], axis=-1)
 
-    return image.astype(dtype), yolo_gt.astype(dtype)
+    return image.astype(dtype) / 255., yolo_gt.astype(dtype)
 
 
 def input_fn(data_set, is_training, batch_size, anchors_path, num_epochs=1, augmentation=None,
