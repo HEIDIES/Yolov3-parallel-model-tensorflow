@@ -249,7 +249,7 @@ def yolo_model_fn(features, labels, mode, model_class,
 
             conv_layer_outputs = tf.reshape(conv_layer_outputs, [-1, shape[1], shape[2], shape[3], shape[4]])
             pred_conf = conv_layer_outputs[..., 4: 5]
-            # pred_class = conv_layer_outputs[..., 5:]
+            pred_class = conv_layer_outputs[..., 5:]
 
             yolo_true = tf.reshape(yolo_true, [-1, shape[1], shape[2], shape[3], shape[4]])
             percent_x, percent_y, percent_w, percent_h, obj_mask, classes = tf.split(yolo_true,
@@ -275,14 +275,28 @@ def yolo_model_fn(features, labels, mode, model_class,
                                          yolo_raw_box_true)
 
             box_loss_scale = 2 - yolo_true[..., 2: 3] * yolo_true[..., 3: 4]
+            COORD_SCALE = 1.
+            OBJECT_SCALE = 5.
+            NO_OBJECT_SCALE = 1.
+            CLASS_SCALE = 1.
 
-            coords_xy_loss = (tf.nn.sigmoid_cross_entropy_with_logits(labels=yolo_raw_box_true[..., 0: 2],
-                                                                      logits=conv_layer_outputs[..., 0: 2])
-                              * obj_mask * box_loss_scale)
+            # coords_xy_loss = (tf.nn.sigmoid_cross_entropy_with_logits(labels=yolo_raw_box_true[..., 0: 2],
+            #                                                           logits=conv_layer_outputs[..., 0: 2])
+            #                   * obj_mask * box_loss_scale)
+
+            xy_delta = (yolo_raw_box_true[..., 0: 2] -
+                        conv_layer_outputs[..., 0: 2]) * obj_mask * box_loss_scale * COORD_SCALE
+            coords_xy_loss = tf.square(xy_delta)
+
             coords_xy_loss = tf.reduce_sum(coords_xy_loss)
 
-            coords_wh_loss = tf.square(yolo_raw_box_true[..., 2: 4]
-                                       - conv_layer_outputs[..., 2: 4]) * 0.5 * obj_mask * box_loss_scale
+            # coords_wh_loss = tf.square(yolo_raw_box_true[..., 2: 4]
+            #                            - conv_layer_outputs[..., 2: 4]) * 0.5 * obj_mask * box_loss_scale
+
+            wh_delta = (yolo_raw_box_true[..., 2: 4]
+                        - conv_layer_outputs[..., 2: 4]) * COORD_SCALE * obj_mask * box_loss_scale
+
+            coords_wh_loss = tf.square(wh_delta)
 
             coords_wh_loss = tf.reduce_sum(coords_wh_loss)
 
@@ -294,20 +308,24 @@ def yolo_model_fn(features, labels, mode, model_class,
             ignore_mask = tf.reshape(ignore_mask, [-1, shape[1], shape[2], num_anchors])
             ignore_mask = tf.expand_dims(ignore_mask, -1)
 
-            back_loss = ((1 - obj_mask)
-                         * tf.nn.sigmoid_cross_entropy_with_logits(labels=obj_mask, logits=pred_conf) * ignore_mask)
-            back_loss = tf.reduce_sum(back_loss)
+            # back_loss = ((1 - obj_mask)
+            #              * tf.nn.sigmoid_cross_entropy_with_logits(labels=obj_mask, logits=pred_conf) * ignore_mask)
+            back_delta = ((1 - obj_mask) * (pred_conf - obj_mask) * ignore_mask * NO_OBJECT_SCALE)
 
-            fore_loss = obj_mask * tf.nn.sigmoid_cross_entropy_with_logits(labels=obj_mask, logits=pred_conf)
+            # fore_loss = obj_mask * tf.nn.sigmoid_cross_entropy_with_logits(labels=obj_mask, logits=pred_conf)
+            fore_delta = obj_mask * (pred_conf - obj_mask) * OBJECT_SCALE
 
-            fore_loss = tf.reduce_sum(fore_loss)
+            conf_delta = back_delta + fore_delta
+            conf_loss = tf.reduce_sum(tf.square(conf_delta))
 
-            conf_loss = back_loss + fore_loss
+            # fore_loss = tf.reduce_sum(fore_loss)
 
-            # cls_loss = obj_mask * tf.nn.sigmoid_cross_entropy_with_logits(labels=classes, logits=pred_class)
-            # cls_loss = tf.reduce_sum(cls_loss)
+            # conf_loss = back_loss + fore_loss
 
-            return coords_loss + conf_loss
+            cls_loss = obj_mask * tf.nn.sigmoid_cross_entropy_with_logits(labels=classes, logits=pred_class) * CLASS_SCALE
+            cls_loss = tf.reduce_sum(cls_loss)
+
+            return coords_loss + conf_loss + cls_loss
 
         num_anchors_per_detector = len(anchors) // 3
 
